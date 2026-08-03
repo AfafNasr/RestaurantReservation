@@ -31,5 +31,36 @@ public class RestaurantTableConfiguration :
             .WithMany(restaurant => restaurant.Tables)
             .HasForeignKey(table => table.RestaurantId)
             .OnDelete(DeleteBehavior.Restrict);
+        builder.HasData(
+             new Table
+             {
+                 TableId = 1,
+                 RestaurantId = 1,
+                 Capacity = 2
+             },
+              new Table
+              {
+                  TableId = 2,
+                  RestaurantId = 2,
+                  Capacity = 4
+              },
+              new Table
+              {
+                  TableId = 3,
+                  RestaurantId = 3,
+                  Capacity = 6
+              },
+               new Table
+               {
+                   TableId = 4,
+                   RestaurantId = 4,
+                   Capacity = 4
+               },
+               new Table
+               {
+                   TableId = 5,
+                   RestaurantId = 5,
+                   Capacity = 8
+               });
     }
 }

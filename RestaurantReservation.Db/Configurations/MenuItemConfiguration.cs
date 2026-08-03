@@ -40,5 +40,47 @@ public class MenuItemConfiguration : IEntityTypeConfiguration<MenuItem>
             .WithMany(restaurant => restaurant.MenuItems)
             .HasForeignKey(menuItem => menuItem.RestaurantId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasData(
+             new MenuItem
+             {
+                 ItemId = 1,
+                 RestaurantId = 1,
+                 Name = "Margherita Pizza",
+                 Description = "Pizza with tomato sauce and mozzarella",
+                 Price = 12.50m
+             },
+              new MenuItem
+              {
+                  ItemId = 2,
+                  RestaurantId = 2,
+                  Name = "Grilled Salmon",
+                  Description = "Salmon served with vegetables",
+                  Price = 18.00m
+              },
+               new MenuItem
+               {
+                   ItemId = 3,
+                   RestaurantId = 3,
+                   Name = "Chicken Pasta",
+                   Description = "Pasta with chicken and cream sauce",
+                   Price = 9.75m
+               },
+               new MenuItem
+               {
+                   ItemId = 4,
+                   RestaurantId = 4,
+                   Name = "Beef Burger",
+                   Description = "Beef burger served with fries",
+                   Price = 15.25m
+               },
+                new MenuItem
+                {
+                    ItemId = 5,
+                    RestaurantId = 5,
+                    Name = "Mixed Grill",
+                    Description = "Selection of grilled meats",
+                    Price = 22.00m
+                });
     }
 }

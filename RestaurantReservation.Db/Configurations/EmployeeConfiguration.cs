@@ -37,5 +37,46 @@ public class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
             .WithMany(restaurant => restaurant.Employees)
             .HasForeignKey(employee => employee.RestaurantId)
             .OnDelete(DeleteBehavior.Restrict);
+        builder.HasData(
+             new Employee
+             {
+                 EmployeeId = 1,
+                 RestaurantId = 1,
+                 FirstName = "Mohammad",
+                 LastName = "Sami",
+                 Position = "Manager"
+             },
+             new Employee
+             {
+                 EmployeeId = 2,
+                 RestaurantId = 2,
+                 FirstName = "Rami",
+                 LastName = "Adel",
+                 Position = "Waiter"
+             },
+             new Employee
+             {
+                 EmployeeId = 3,
+                 RestaurantId = 3,
+                 FirstName = "Maha",
+                 LastName = "Nabil",
+                 Position = "Manager"
+             },
+             new Employee
+             {
+                 EmployeeId = 4,
+                 RestaurantId = 4,
+                 FirstName = "Kareem",
+                 LastName = "Tareq",
+                 Position = "Waiter"
+             },
+              new Employee
+              {
+                  EmployeeId = 5,
+                  RestaurantId = 5,
+                  FirstName = "Noor",
+                  LastName = "Fadi",
+                  Position = "Manager"
+              });
     }
 }

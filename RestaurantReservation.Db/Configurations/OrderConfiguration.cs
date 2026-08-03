@@ -44,5 +44,47 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
             .WithMany(employee => employee.Orders)
             .HasForeignKey(order => order.EmployeeId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasData(
+            new Order
+            {
+                OrderId = 1,
+                ReservationId = 1,
+                EmployeeId = 1,
+                OrderDate = new DateTime(2026, 8, 10, 18, 15, 0),
+                TotalAmount = 25.00m
+            },
+            new Order
+            {
+                OrderId = 2,
+                ReservationId = 2,
+                EmployeeId = 2,
+                OrderDate = new DateTime(2026, 8, 11, 19, 20, 0),
+                TotalAmount = 18.00m
+            },
+            new Order
+            {
+                OrderId = 3,
+                ReservationId = 3,
+                EmployeeId = 3,
+                OrderDate = new DateTime(2026, 8, 12, 17, 45, 0),
+                TotalAmount = 29.25m
+            },
+            new Order
+            {
+                OrderId = 4,
+                ReservationId = 4,
+                EmployeeId = 4,
+                OrderDate = new DateTime(2026, 8, 13, 20, 15, 0),
+                TotalAmount = 30.50m
+            },
+             new Order
+             {
+                 OrderId = 5,
+                 ReservationId = 5,
+                 EmployeeId = 5,
+                 OrderDate = new DateTime(2026, 8, 14, 18, 45, 0),
+                 TotalAmount = 22.00m
+             });
     }
 }
