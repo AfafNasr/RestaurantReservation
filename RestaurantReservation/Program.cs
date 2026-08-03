@@ -1,1 +1,23 @@
-﻿Console.WriteLine("Hello, World!");
+﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using RestaurantReservation.Db.Data;
+
+IConfiguration configuration = new ConfigurationBuilder()
+    .SetBasePath(AppContext.BaseDirectory)
+    .AddJsonFile("appsettings.json", optional: false)
+    .Build();
+
+string connectionString =
+    configuration.GetConnectionString("DefaultConnection")
+    ?? throw new InvalidOperationException(
+        "The connection string 'DefaultConnection' was not found.");
+
+DbContextOptions<RestaurantReservationDbContext> options =
+    new DbContextOptionsBuilder<RestaurantReservationDbContext>()
+        .UseSqlServer(connectionString)
+        .Options;
+
+await using RestaurantReservationDbContext dbContext =
+    new(options);
+
+Console.WriteLine("Entity Framework Core configuration completed successfully.");
