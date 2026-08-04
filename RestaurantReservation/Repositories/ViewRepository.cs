@@ -29,4 +29,17 @@ public class ViewRepository
             .ThenBy(view => view.EmployeeLastName)
             .ToListAsync();
     }
+    public async Task<decimal?> CalculateRestaurantRevenueAsync(
+    int restaurantId)
+    {
+        return await _dbContext.Restaurants
+            .AsNoTracking()
+            .Where(restaurant =>
+                restaurant.RestaurantId == restaurantId)
+            .Select(restaurant =>
+                (decimal?)RestaurantReservationDbContext
+                    .CalculateRestaurantRevenue(
+                        restaurant.RestaurantId))
+            .FirstOrDefaultAsync();
+    }
 }

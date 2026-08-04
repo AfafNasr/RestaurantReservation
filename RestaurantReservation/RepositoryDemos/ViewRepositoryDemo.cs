@@ -20,6 +20,8 @@ public static class ReportingRepositoryDemo
 
         await DemonstrateEmployeeRestaurantViewAsync(repository);
 
+        await DemonstrateCalculateRestaurantRevenueAsync( repository,restaurantId: 1);
+
         DemoConsoleHelper.PrintDemoCompleted(
             "Database Views Demo");
     }
@@ -102,5 +104,29 @@ public static class ReportingRepositoryDemo
                 $"Restaurant address: " +
                 $"{employee.RestaurantAddress}");
         }
+    }
+
+    private static async Task
+    DemonstrateCalculateRestaurantRevenueAsync(
+        ViewRepository repository,
+        int restaurantId)
+    {
+        DemoConsoleHelper.PrintMethodTitle(
+            "CalculateRestaurantRevenueAsync");
+
+        decimal? revenue =
+            await repository.CalculateRestaurantRevenueAsync(
+                restaurantId);
+
+        Console.WriteLine($"Restaurant Id: {restaurantId}");
+
+        if (revenue is null)
+        {
+            DemoConsoleHelper.PrintNotFound("Restaurant");
+            return;
+        }
+
+        Console.WriteLine(
+            $"Total revenue: {revenue.Value:F2}");
     }
 }

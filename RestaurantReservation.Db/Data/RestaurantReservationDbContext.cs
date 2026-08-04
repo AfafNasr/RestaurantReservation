@@ -32,10 +32,25 @@ public class RestaurantReservationDbContext : DbContext
 
     public DbSet<EmployeeRestaurantView> EmployeeRestaurantDetails => Set<EmployeeRestaurantView>();
 
+    public static decimal CalculateRestaurantRevenue(int restaurantId)
+    {
+        throw new NotSupportedException(
+            "This method can only be used inside an EF Core LINQ query.");
+    }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(
             typeof(RestaurantReservationDbContext).Assembly);
+
+        modelBuilder
+            .HasDbFunction(
+                typeof(RestaurantReservationDbContext)
+                    .GetMethod(
+                           nameof(CalculateRestaurantRevenue),
+                           new[] { typeof(int) })!)
+            .HasName("fn_CalculateRestaurantRevenue")
+            .HasSchema("dbo");
 
         base.OnModelCreating(modelBuilder);
     }
