@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using RestaurantReservation.Db.Models;
 using RestaurantReservation.Db.Views;
+using RestaurantReservation.Db.StoredProcedure;
 
 namespace RestaurantReservation.Db.Data;
 
@@ -38,6 +39,9 @@ public class RestaurantReservationDbContext : DbContext
             "This method can only be used inside an EF Core LINQ query.");
     }
 
+    public DbSet<CustomerLargePartyReservationResult>
+    CustomerLargePartyReservations =>
+        Set<CustomerLargePartyReservationResult>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(

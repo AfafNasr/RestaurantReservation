@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using RestaurantReservation.Db.Data;
 using RestaurantReservation.Db.Views;
+using RestaurantReservation.Db.StoredProcedure;
 
 namespace RestaurantReservation.Db.Repositories;
 
@@ -41,5 +42,25 @@ public class ViewRepository
                     .CalculateRestaurantRevenue(
                         restaurant.RestaurantId))
             .FirstOrDefaultAsync();
+    }
+
+    public async Task<List<CustomerLargePartyReservationResult>>
+    GetCustomersByMinimumPartySizeAsync(int minimumPartySize)
+    {
+        if (minimumPartySize < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(minimumPartySize),
+                "Minimum party size cannot be negative.");
+        }
+
+        return await _dbContext.CustomerLargePartyReservations
+            .FromSqlInterpolated(
+                $"""
+             EXEC dbo.sp_GetCustomersByMinimumPartySize
+                 @MinimumPartySize = {minimumPartySize}
+             """)
+            .AsNoTracking()
+            .ToListAsync();
     }
 }

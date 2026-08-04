@@ -32,4 +32,4 @@ await ReservationRepositoryDemo.RunAsync(dbContext);
 await OrderRepositoryDemo.RunAsync(dbContext);
 await OrderItemRepositoryDemo.RunAsync(dbContext);
 
-await ReportingRepositoryDemo.RunAsync(dbContext);
+await ViewRepositoryDemo.RunAsync(dbContext);

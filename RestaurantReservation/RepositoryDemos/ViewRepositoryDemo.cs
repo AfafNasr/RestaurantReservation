@@ -1,10 +1,11 @@
 ﻿using RestaurantReservation.Db.Data;
 using RestaurantReservation.Db.Repositories;
 using RestaurantReservation.Db.Views;
+using RestaurantReservation.Db.StoredProcedure;
 
 namespace RestaurantReservation.RepositoryDemos;
 
-public static class ReportingRepositoryDemo
+public static class ViewRepositoryDemo
 {
     public static async Task RunAsync(
         RestaurantReservationDbContext dbContext)
@@ -21,6 +22,8 @@ public static class ReportingRepositoryDemo
         await DemonstrateEmployeeRestaurantViewAsync(repository);
 
         await DemonstrateCalculateRestaurantRevenueAsync( repository,restaurantId: 1);
+
+        await DemonstrateCustomersByMinimumPartySizeAsync(repository, minimumPartySize: 3);
 
         DemoConsoleHelper.PrintDemoCompleted(
             "Database Views Demo");
@@ -128,5 +131,49 @@ public static class ReportingRepositoryDemo
 
         Console.WriteLine(
             $"Total revenue: {revenue.Value:F2}");
+    }
+
+    private static async Task
+    DemonstrateCustomersByMinimumPartySizeAsync(
+        ViewRepository repository,
+        int minimumPartySize)
+    {
+        DemoConsoleHelper.PrintMethodTitle(
+            "GetCustomersByMinimumPartySizeAsync");
+
+        List<CustomerLargePartyReservationResult> results =
+            await repository.GetCustomersByMinimumPartySizeAsync(
+                minimumPartySize);
+
+        Console.WriteLine(
+            $"Minimum party size: {minimumPartySize}");
+
+        Console.WriteLine(
+            $"Matching reservations count: {results.Count}");
+
+        foreach (CustomerLargePartyReservationResult result in results)
+        {
+            Console.WriteLine();
+
+            Console.WriteLine(
+                $"Customer Id: {result.CustomerId}");
+
+            Console.WriteLine(
+                $"Customer: {result.FirstName} {result.LastName}");
+
+            Console.WriteLine($"Email: {result.Email}");
+
+            Console.WriteLine(
+                $"Reservation Id: {result.ReservationId}");
+
+            Console.WriteLine(
+                $"Reservation date: {result.ReservationDate:g}");
+
+            Console.WriteLine(
+                $"Party size: {result.PartySize}");
+
+            Console.WriteLine(
+                $"Restaurant: {result.RestaurantName}");
+        }
     }
 }
