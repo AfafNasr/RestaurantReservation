@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using RestaurantReservation.Db.Models;
+using RestaurantReservation.Db.Views;
 
 namespace RestaurantReservation.Db.Data;
 
@@ -26,6 +27,10 @@ public class RestaurantReservationDbContext : DbContext
     public DbSet<MenuItem> MenuItems => Set<MenuItem>();
 
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
+
+    public DbSet<ReservationDetailsView> ReservationDetails => Set<ReservationDetailsView>();
+
+    public DbSet<EmployeeRestaurantView> EmployeeRestaurantDetails => Set<EmployeeRestaurantView>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
