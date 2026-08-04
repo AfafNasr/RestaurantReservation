@@ -1,1 +1,4 @@
-<Solution />
+<Solution>
+  <Project Path="RestaurantReservation.Db/RestaurantReservation.Db.csproj" />
+  <Project Path="RestaurantReservation/RestaurantReservation.csproj" />
+</Solution>

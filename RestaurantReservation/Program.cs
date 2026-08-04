@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using RestaurantReservation.Db.Data;
+using RestaurantReservation.RepositoryDemos;
 
 IConfiguration configuration = new ConfigurationBuilder()
     .SetBasePath(AppContext.BaseDirectory)
@@ -21,3 +22,12 @@ await using RestaurantReservationDbContext dbContext =
     new(options);
 
 Console.WriteLine("Entity Framework Core configuration completed successfully.");
+
+await RestaurantRepositoryDemo.RunAsync(dbContext);
+await CustomerRepositoryDemo.RunAsync(dbContext);
+await EmployeeRepositoryDemo.RunAsync(dbContext);
+await RestaurantTableRepositoryDemo.RunAsync(dbContext);
+await MenuItemRepositoryDemo.RunAsync(dbContext);
+await ReservationRepositoryDemo.RunAsync(dbContext);
+await OrderRepositoryDemo.RunAsync(dbContext);
+await OrderItemRepositoryDemo.RunAsync(dbContext);
