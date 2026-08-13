@@ -1,9 +1,14 @@
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using RestaurantReservation.API.Models;
+using RestaurantReservation.API.Services;
 using RestaurantReservation.Db;
 using RestaurantReservation.Db.Data;
 using RestaurantReservation.Db.Models;
 using RestaurantReservation.Db.Repositories;
+using System.Text;
+using RestaurantReservation.API.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,6 +23,34 @@ builder.Services.AddDbContext<RestaurantReservationDbContext>(options =>
 builder.Services.AddScoped<EmployeeRepository>();
 builder.Services.AddScoped<ReservationRepository>();
 builder.Services.AddScoped<OrderRepository>();
+builder.Services.AddScoped<JwtTokenGenerator>();
+
+var jwtKey = builder.Configuration["Jwt:Key"]
+    ?? throw new InvalidOperationException("JWT key is missing.");
+
+var jwtIssuer = builder.Configuration["Jwt:Issuer"];
+var jwtAudience = builder.Configuration["Jwt:Audience"];
+
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+
+            ValidIssuer = jwtIssuer,
+            ValidAudience = jwtAudience,
+
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(jwtKey))
+        };
+    });
+
+builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
@@ -41,7 +74,10 @@ app.MapGet("/api/reservations", async (RestaurantReservationDbContext db) =>
         .ToListAsync();
 
     return Results.Ok(reservations);
-});
+})
+    .RequireAuthorization(); 
+;
+
 
 app.MapGet("/api/reservations/{id:int}",
     async (int id, RestaurantReservationDbContext db) =>
@@ -53,7 +89,9 @@ app.MapGet("/api/reservations/{id:int}",
         return reservation is null
             ? Results.NotFound(new { message = "Reservation not found." })
             : Results.Ok(reservation);
-    });
+    })
+    .RequireAuthorization(); 
+;
 
 app.MapPost("/api/reservations",
     async (ReservationRequest request, RestaurantReservationDbContext db) =>
@@ -73,7 +111,8 @@ app.MapPost("/api/reservations",
         return Results.Created(
             $"/api/reservations/{reservation.ReservationId}",
             reservation);
-    });
+    }).RequireAuthorization(); 
+;
 
 app.MapPut("/api/reservations/{id:int}",
     async (
@@ -98,7 +137,8 @@ app.MapPut("/api/reservations/{id:int}",
         await db.SaveChangesAsync();
 
         return Results.Ok(reservation);
-    });
+    }).RequireAuthorization(); 
+;
 
 app.MapDelete("/api/reservations/{id:int}",
     async (int id, RestaurantReservationDbContext db) =>
@@ -115,7 +155,8 @@ app.MapDelete("/api/reservations/{id:int}",
         await db.SaveChangesAsync();
 
         return Results.NoContent();
-    });
+    }).RequireAuthorization(); 
+;
 
 app.MapGet("/api/employees/managers",
     async (EmployeeRepository repository) =>
@@ -123,7 +164,8 @@ app.MapGet("/api/employees/managers",
         var managers = await repository.ListManagersAsync();
 
         return Results.Ok(managers);
-    });
+    }).RequireAuthorization(); 
+;
 
 app.MapGet("/api/reservations/customer/{customerId:int}",
     async (int customerId, ReservationRepository repository) =>
@@ -132,7 +174,8 @@ app.MapGet("/api/reservations/customer/{customerId:int}",
             await repository.GetReservationsByCustomerAsync(customerId);
 
         return Results.Ok(reservations);
-    });
+    }).RequireAuthorization(); 
+;
 
 app.MapGet("/api/reservations/{reservationId:int}/orders",
     async (int reservationId, OrderRepository repository) =>
@@ -165,7 +208,8 @@ app.MapGet("/api/reservations/{reservationId:int}/orders",
         });
 
         return Results.Ok(result);
-    });
+    }).RequireAuthorization(); 
+;
 
 app.MapGet("/api/reservations/{reservationId:int}/menu-items",
     async (int reservationId, OrderRepository repository) =>
@@ -174,7 +218,8 @@ app.MapGet("/api/reservations/{reservationId:int}/menu-items",
             await repository.ListOrderedMenuItemsAsync(reservationId);
 
         return Results.Ok(menuItems);
-    });
+    }).RequireAuthorization(); 
+;
 
 app.MapGet("/api/employees/{employeeId:int}/average-order-amount",
     async (int employeeId, OrderRepository repository) =>
@@ -186,6 +231,24 @@ app.MapGet("/api/employees/{employeeId:int}/average-order-amount",
         {
             employeeId,
             averageOrderAmount
+        });
+    }).RequireAuthorization(); 
+;
+
+app.MapPost("/api/auth/login",
+    (LoginRequest request, JwtTokenGenerator tokenGenerator) =>
+    {
+        if (request.Username != "admin" ||
+            request.Password != "Admin123!")
+        {
+            return Results.Unauthorized();
+        }
+
+        var token = tokenGenerator.GenerateToken(request.Username);
+
+        return Results.Ok(new
+        {
+            accessToken = token
         });
     });
 
