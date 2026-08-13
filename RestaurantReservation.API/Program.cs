@@ -3,6 +3,7 @@ using RestaurantReservation.API.Models;
 using RestaurantReservation.Db;
 using RestaurantReservation.Db.Data;
 using RestaurantReservation.Db.Models;
+using RestaurantReservation.Db.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,6 +14,10 @@ builder.Services.AddOpenApi();
 builder.Services.AddDbContext<RestaurantReservationDbContext>(options =>
     options.UseSqlServer(
         builder.Configuration.GetConnectionString("DefaultConnection")));
+
+builder.Services.AddScoped<EmployeeRepository>();
+builder.Services.AddScoped<ReservationRepository>();
+builder.Services.AddScoped<OrderRepository>();
 
 var app = builder.Build();
 
@@ -112,6 +117,77 @@ app.MapDelete("/api/reservations/{id:int}",
         return Results.NoContent();
     });
 
+app.MapGet("/api/employees/managers",
+    async (EmployeeRepository repository) =>
+    {
+        var managers = await repository.ListManagersAsync();
+
+        return Results.Ok(managers);
+    });
+
+app.MapGet("/api/reservations/customer/{customerId:int}",
+    async (int customerId, ReservationRepository repository) =>
+    {
+        var reservations =
+            await repository.GetReservationsByCustomerAsync(customerId);
+
+        return Results.Ok(reservations);
+    });
+
+app.MapGet("/api/reservations/{reservationId:int}/orders",
+    async (int reservationId, OrderRepository repository) =>
+    {
+        var orders =
+            await repository.ListOrdersAndMenuItemsAsync(reservationId);
+
+        var result = orders.Select(order => new
+        {
+            order.OrderId,
+            order.ReservationId,
+            order.EmployeeId,
+            order.OrderDate,
+            order.TotalAmount,
+
+            Items = order.OrderItems.Select(orderItem => new
+            {
+                orderItem.OrderItemId,
+                orderItem.ItemId,
+                orderItem.Quantity,
+
+                MenuItem = new
+                {
+                    orderItem.MenuItem.ItemId,
+                    orderItem.MenuItem.Name,
+                    orderItem.MenuItem.Description,
+                    orderItem.MenuItem.Price
+                }
+            })
+        });
+
+        return Results.Ok(result);
+    });
+
+app.MapGet("/api/reservations/{reservationId:int}/menu-items",
+    async (int reservationId, OrderRepository repository) =>
+    {
+        var menuItems =
+            await repository.ListOrderedMenuItemsAsync(reservationId);
+
+        return Results.Ok(menuItems);
+    });
+
+app.MapGet("/api/employees/{employeeId:int}/average-order-amount",
+    async (int employeeId, OrderRepository repository) =>
+    {
+        var averageOrderAmount =
+            await repository.CalculateAverageOrderAmountAsync(employeeId);
+
+        return Results.Ok(new
+        {
+            employeeId,
+            averageOrderAmount
+        });
+    });
 
 app.Run();
 
