@@ -51,6 +51,7 @@ builder.Services
     });
 
 builder.Services.AddAuthorization();
+builder.Services.AddValidation();
 
 var app = builder.Build();
 
@@ -67,6 +68,22 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+app.UseExceptionHandler(exceptionHandlerApp =>
+{
+    exceptionHandlerApp.Run(async context =>
+    {
+        context.Response.StatusCode =
+            StatusCodes.Status500InternalServerError;
+
+        context.Response.ContentType = "application/json";
+
+        await context.Response.WriteAsJsonAsync(new
+        {
+            message = "An unexpected error occurred. Please try again later."
+        });
+    });
+});
+
 app.MapGet("/api/reservations", async (RestaurantReservationDbContext db) =>
 {
     var reservations = await db.Reservations
@@ -82,6 +99,13 @@ app.MapGet("/api/reservations", async (RestaurantReservationDbContext db) =>
 app.MapGet("/api/reservations/{id:int}",
     async (int id, RestaurantReservationDbContext db) =>
     {
+        if (id <= 0)
+        {
+            return Results.BadRequest(new
+            {
+                message = "ReservationId must be greater than 0."
+            });
+        }
         var reservation = await db.Reservations
             .AsNoTracking()
             .FirstOrDefaultAsync(r => r.ReservationId == id);
@@ -96,6 +120,64 @@ app.MapGet("/api/reservations/{id:int}",
 app.MapPost("/api/reservations",
     async (ReservationRequest request, RestaurantReservationDbContext db) =>
     {
+        var customerExists = await db.Customers
+            .AnyAsync(c => c.CustomerId == request.CustomerId);
+
+        if (!customerExists)
+        {
+            return Results.BadRequest(new
+            {
+                message = "The specified customer does not exist."
+            });
+        }
+
+        var restaurantExists = await db.Restaurants
+            .AnyAsync(r => r.RestaurantId == request.RestaurantId);
+
+        if (!restaurantExists)
+        {
+            return Results.BadRequest(new
+            {
+                message = "The specified restaurant does not exist."
+            });
+        }
+
+        var table = await db.Tables
+            .AsNoTracking()
+            .FirstOrDefaultAsync(t => t.TableId == request.TableId);
+
+        if (table is null)
+        {
+            return Results.BadRequest(new
+            {
+                message = "The specified table does not exist."
+            });
+        }
+
+        if (table.RestaurantId != request.RestaurantId)
+        {
+            return Results.BadRequest(new
+            {
+                message = "The selected table does not belong to the specified restaurant."
+            });
+        }
+
+        if (request.PartySize > table.Capacity)
+        {
+            return Results.BadRequest(new
+            {
+                message = "Party size exceeds the selected table capacity."
+            });
+        }
+
+        if (request.ReservationDate <= DateTime.Now)
+        {
+            return Results.BadRequest(new
+            {
+                message = "Reservation date must be in the future."
+            });
+        }
+
         var reservation = new Reservation
         {
             CustomerId = request.CustomerId,
@@ -120,12 +202,78 @@ app.MapPut("/api/reservations/{id:int}",
         ReservationRequest request,
         RestaurantReservationDbContext db) =>
     {
+        if (id <= 0)
+        {
+            return Results.BadRequest(new
+            {
+                message = "ReservationId must be greater than 0."
+            });
+        }
+
+        if (request.ReservationDate <= DateTime.Now)
+        {
+            return Results.BadRequest(new
+            {
+                message = "Reservation date must be in the future."
+            });
+        }
+
         var reservation = await db.Reservations.FindAsync(id);
 
         if (reservation is null)
         {
             return Results.NotFound(
                 new { message = "Reservation not found." });
+        }
+
+        var customerExists = await db.Customers
+            .AnyAsync(c => c.CustomerId == request.CustomerId);
+
+        if (!customerExists)
+        {
+            return Results.BadRequest(new
+            {
+                message = "The specified customer does not exist."
+            });
+        }
+
+        var restaurantExists = await db.Restaurants
+            .AnyAsync(r => r.RestaurantId == request.RestaurantId);
+
+        if (!restaurantExists)
+        {
+            return Results.BadRequest(new
+            {
+                message = "The specified restaurant does not exist."
+            });
+        }
+
+        var table = await db.Tables
+            .AsNoTracking()
+            .FirstOrDefaultAsync(t => t.TableId == request.TableId);
+
+        if (table is null)
+        {
+            return Results.BadRequest(new
+            {
+                message = "The specified table does not exist."
+            });
+        }
+
+        if (table.RestaurantId != request.RestaurantId)
+        {
+            return Results.BadRequest(new
+            {
+                message = "The selected table does not belong to the specified restaurant."
+            });
+        }
+
+        if (request.PartySize > table.Capacity)
+        {
+            return Results.BadRequest(new
+            {
+                message = "Party size exceeds the selected table capacity."
+            });
         }
 
         reservation.CustomerId = request.CustomerId;
@@ -143,6 +291,14 @@ app.MapPut("/api/reservations/{id:int}",
 app.MapDelete("/api/reservations/{id:int}",
     async (int id, RestaurantReservationDbContext db) =>
     {
+        if (id <= 0)
+        {
+            return Results.BadRequest(new
+            {
+                message = "ReservationId must be greater than 0."
+            });
+        }
+
         var reservation = await db.Reservations.FindAsync(id);
 
         if (reservation is null)
@@ -168,8 +324,27 @@ app.MapGet("/api/employees/managers",
 ;
 
 app.MapGet("/api/reservations/customer/{customerId:int}",
-    async (int customerId, ReservationRepository repository) =>
+    async (int customerId, ReservationRepository repository, RestaurantReservationDbContext db) =>
     {
+        if (customerId <= 0)
+        {
+            return Results.BadRequest(new
+            {
+                message = "CustomerId must be greater than 0."
+            });
+        }
+
+        var customerExists = await db.Customers
+            .AnyAsync(c => c.CustomerId == customerId);
+
+        if (!customerExists)
+        {
+            return Results.NotFound(new
+            {
+                message = "Customer not found."
+            });
+        }
+
         var reservations =
             await repository.GetReservationsByCustomerAsync(customerId);
 
@@ -178,8 +353,27 @@ app.MapGet("/api/reservations/customer/{customerId:int}",
 ;
 
 app.MapGet("/api/reservations/{reservationId:int}/orders",
-    async (int reservationId, OrderRepository repository) =>
+    async (int reservationId, OrderRepository repository, RestaurantReservationDbContext db) =>
     {
+        if (reservationId <= 0)
+        {
+            return Results.BadRequest(new
+            {
+                message = "ReservationId must be greater than 0."
+            });
+        }
+
+        var reservationExists = await db.Reservations
+           .AnyAsync(r => r.ReservationId == reservationId);
+
+        if (!reservationExists)
+        {
+            return Results.NotFound(new
+            {
+                message = "Reservation not found."
+            });
+        }
+
         var orders =
             await repository.ListOrdersAndMenuItemsAsync(reservationId);
 
@@ -212,8 +406,27 @@ app.MapGet("/api/reservations/{reservationId:int}/orders",
 ;
 
 app.MapGet("/api/reservations/{reservationId:int}/menu-items",
-    async (int reservationId, OrderRepository repository) =>
+    async (int reservationId, OrderRepository repository, RestaurantReservationDbContext db) =>
     {
+        if (reservationId <= 0)
+        {
+            return Results.BadRequest(new
+            {
+                message = "ReservationId must be greater than 0."
+            });
+        }
+
+        var reservationExists = await db.Reservations
+            .AnyAsync(r => r.ReservationId == reservationId);
+
+        if (!reservationExists)
+        {
+            return Results.NotFound(new
+            {
+                message = "Reservation not found."
+            });
+        }
+
         var menuItems =
             await repository.ListOrderedMenuItemsAsync(reservationId);
 
@@ -222,8 +435,27 @@ app.MapGet("/api/reservations/{reservationId:int}/menu-items",
 ;
 
 app.MapGet("/api/employees/{employeeId:int}/average-order-amount",
-    async (int employeeId, OrderRepository repository) =>
+    async (int employeeId, OrderRepository repository, RestaurantReservationDbContext db) =>
     {
+        if (employeeId <= 0)
+        {
+            return Results.BadRequest(new
+            {
+                message = "EmployeeId must be greater than 0."
+            });
+        }
+
+        var employeeExists = await db.Employees
+            .AnyAsync(e => e.EmployeeId == employeeId);
+
+        if (!employeeExists)
+        {
+            return Results.NotFound(new
+            {
+                message = "Employee not found."
+            });
+        }
+
         var averageOrderAmount =
             await repository.CalculateAverageOrderAmountAsync(employeeId);
 
@@ -238,6 +470,15 @@ app.MapGet("/api/employees/{employeeId:int}/average-order-amount",
 app.MapPost("/api/auth/login",
     (LoginRequest request, JwtTokenGenerator tokenGenerator) =>
     {
+        if (string.IsNullOrWhiteSpace(request.Username) ||
+    string.IsNullOrWhiteSpace(request.Password))
+        {
+            return Results.BadRequest(new
+            {
+                message = "Username and password are required."
+            });
+        }
+
         if (request.Username != "admin" ||
             request.Password != "Admin123!")
         {
