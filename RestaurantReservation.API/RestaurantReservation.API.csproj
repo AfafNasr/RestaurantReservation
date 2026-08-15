@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Grpc.AspNetCore" Version="2.83.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.11" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.11" />
     <PackageReference Include="Microsoft.Extensions.Validation" Version="10.0.11" />
@@ -17,5 +18,9 @@
   <ItemGroup>
     <ProjectReference Include="..\RestaurantReservation.Db\RestaurantReservation.Db.csproj" />
   </ItemGroup>
+
+   <ItemGroup>
+  <Protobuf Include="Protos\reservation.proto" GrpcServices="Server" />
+</ItemGroup>
 
 </Project>

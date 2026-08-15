@@ -9,6 +9,7 @@ using RestaurantReservation.Db.Models;
 using RestaurantReservation.Db.Repositories;
 using System.Text;
 using RestaurantReservation.API.Services;
+using RestaurantReservation.API.Grpc;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -24,6 +25,7 @@ builder.Services.AddScoped<EmployeeRepository>();
 builder.Services.AddScoped<ReservationRepository>();
 builder.Services.AddScoped<OrderRepository>();
 builder.Services.AddScoped<JwtTokenGenerator>();
+
 
 var jwtKey = builder.Configuration["Jwt:Key"]
     ?? throw new InvalidOperationException("JWT key is missing.");
@@ -53,7 +55,11 @@ builder.Services
 builder.Services.AddAuthorization();
 builder.Services.AddValidation();
 
+builder.Services.AddGrpc();
+
 var app = builder.Build();
+
+app.MapGrpcService<ReservationGrpcService>();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
