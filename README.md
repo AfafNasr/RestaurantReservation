@@ -1,14 +1,14 @@
 # Restaurant Reservation System
 
-A .NET console application built with Entity Framework Core and SQL Server to manage restaurants, customers, employees, tables, reservations, orders, menu items, and order items.
+A .NET solution built with Entity Framework Core, SQL Server, ASP.NET Core Minimal APIs, JWT authentication, OpenAPI/Swagger to manage restaurants, customers, employees, tables, reservations, orders, menu items, and order items.
 
-The project demonstrates Code First development, EF Core migrations, Fluent API configuration, data seeding, asynchronous repositories, LINQ queries, database views, a scalar database function, and a stored procedure.
+The project demonstrates Code First development, EF Core migrations, Fluent API configuration, data seeding, asynchronous repositories, LINQ queries, database views, a scalar database function, and a stored procedure, REST APIs, JWT-based authorization, input validation, API documentation, and gRPC CRUD operations.
 
 ---
 
 ## Solution Structure
 
-The solution contains two projects:
+The solution contains three projects:
 
 ### `RestaurantReservation`
 
@@ -34,6 +34,20 @@ A class library responsible for:
 - Seed data.
 - Database view models.
 - Stored procedure models.
+
+  ### `RestaurantReservation.API`
+
+An ASP.NET Core Web API project responsible for exposing the application functionality through HTTP and gRPC endpoints.
+
+It includes:
+
+- Minimal API endpoints for reservation CRUD operations.
+- Additional endpoints for managers, customer reservations, reservation orders, ordered menu items, and employee average order amounts.
+- JWT authentication and authorization.
+- Input validation and business-rule validation.
+- Global error handling with user-friendly error responses.
+- OpenAPI documentation with Swagger UI.
+- gRPC CRUD operations for reservations.
 
 ---
 
@@ -374,29 +388,185 @@ RepositoryDemos
 This keeps `Program.cs` small and organized.
 
 ---
+---
 
-## Configuration
+## REST API
 
-The runtime connection string is stored in:
+The `RestaurantReservation.API` project exposes the database functionality through ASP.NET Core Minimal APIs.
+
+### Reservation CRUD Endpoints
 
 ```text
-RestaurantReservation/appsettings.json
+GET    /api/reservations
+GET    /api/reservations/{id}
+POST   /api/reservations
+PUT    /api/reservations/{id}
+DELETE /api/reservations/{id}
 ```
-The `appsettings.json` file is copied to the output directory during the build.
+
+### Additional Endpoints
+
+```text
+GET /api/employees/managers
+GET /api/reservations/customer/{customerId}
+GET /api/reservations/{reservationId}/orders
+GET /api/reservations/{reservationId}/menu-items
+GET /api/employees/{employeeId}/average-order-amount
+```
+
+The API reuses the existing Entity Framework Core repositories and `RestaurantReservationDbContext` from the `RestaurantReservation.Db` project.
+
+---
+
+## Authentication and Authorization
+
+The API is secured using JWT Bearer authentication.
+
+A login endpoint is provided to generate an access token:
+
+```text
+POST /api/auth/login
+```
+
+Protected endpoints require the JWT to be sent using the `Authorization` header:
+
+```text
+Authorization: Bearer <token>
+```
+
+JWT validation includes:
+
+- Issuer validation.
+- Audience validation.
+- Token lifetime validation.
+- Signing key validation.
+
+The JWT signing key is stored using .NET User Secrets during development instead of being committed to the repository.
+
+---
+
+## Validation and Error Handling
+
+The API uses built-in .NET validation with Data Annotations for request validation.
+
+Validation includes:
+
+- Positive identifiers.
+- Positive party size.
+- Customer existence.
+- Restaurant existence.
+- Table existence.
+- Ensuring that the selected table belongs to the specified restaurant.
+- Ensuring that the party size does not exceed the table capacity.
+
+The API provides user-friendly responses for common errors:
+
+```text
+400 Bad Request
+401 Unauthorized
+404 Not Found
+500 Internal Server Error
+```
+
+A global exception handler is used for unexpected errors.
+
+---
+
+## OpenAPI and Swagger
+
+The API uses OpenAPI for API documentation and Swagger UI for interactive exploration and testing.
+
+The documentation includes:
+
+- Endpoint descriptions.
+- Route parameters.
+- Request bodies.
+- Expected responses.
+- Possible HTTP status codes.
+
+Swagger UI is available in the Development environment at:
+
+```text
+/swagger
+```
+
+---
+
+## API Testing
+
+The REST API endpoints were manually tested using:
+
+- Postman.
+- Swagger UI.
+
+Testing covered successful requests as well as common validation, authentication, and error scenarios.
+
+---
+
+## gRPC Bonus
+
+The project also includes a gRPC implementation of the main reservation CRUD operations.
+
+The gRPC contract is defined in:
+
+```text
+RestaurantReservation.API/Protos/reservation.proto
+```
+
+The gRPC service implementation is located in:
+
+```text
+RestaurantReservation.API/Grpc/ReservationGrpcService.cs
+```
+
+The service supports:
+
+```text
+GetAllReservations
+GetReservationById
+CreateReservation
+UpdateReservation
+DeleteReservation
+```
+
+The gRPC service uses the same Entity Framework Core `DbContext` and SQL Server database as the REST API.
+
+The gRPC operations were manually tested using Postman's gRPC client.
 
 ---
 
 ## Running the Project
 
-1. Create the `RestaurantReservationCore` database.
-2. Update the connection string in `appsettings.json`.
-3. Apply the migrations:
+### 1. Configure the Database
+
+Create the `RestaurantReservationCore` database and update the connection string in `appsettings.json`.
+
+### 2. Apply Migrations
 
 ```powershell
 dotnet ef database update
 ```
-Run the application:
+
+### 3. Run the Console Application
 
 ```powershell
-dotnet run
+dotnet run --project RestaurantReservation
 ```
+
+### 4. Configure the JWT Secret
+
+Set the JWT signing key using .NET User Secrets:
+
+```powershell
+dotnet user-secrets set "Jwt:Key" "your-secret-key" --project RestaurantReservation.API
+```
+
+### 5. Run the Web API
+
+```powershell
+dotnet run --project RestaurantReservation.API 
+```
+
+The REST API can be explored and tested using Swagger UI or Postman.
+
+The gRPC reservation service can also be tested using Postman's gRPC .
