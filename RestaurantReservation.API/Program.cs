@@ -92,7 +92,13 @@ app.MapGet("/api/reservations", async (RestaurantReservationDbContext db) =>
 
     return Results.Ok(reservations);
 })
-    .RequireAuthorization(); 
+    .RequireAuthorization()
+    .WithTags("Reservations")
+    .WithSummary("Get all reservations")
+    .WithDescription("Retrieves all reservations.")
+    .Produces<List<Reservation>>(StatusCodes.Status200OK)
+    .Produces(StatusCodes.Status401Unauthorized)
+    .Produces(StatusCodes.Status500InternalServerError)
 ;
 
 
@@ -114,7 +120,15 @@ app.MapGet("/api/reservations/{id:int}",
             ? Results.NotFound(new { message = "Reservation not found." })
             : Results.Ok(reservation);
     })
-    .RequireAuthorization(); 
+    .RequireAuthorization()
+    .WithTags("Reservations")
+    .WithSummary("Get reservation by ID")
+    .WithDescription("Retrieves a reservation using its unique identifier.")
+    .Produces<Reservation>(StatusCodes.Status200OK)
+    .Produces(StatusCodes.Status400BadRequest)
+    .Produces(StatusCodes.Status401Unauthorized)
+    .Produces(StatusCodes.Status404NotFound)
+    .Produces(StatusCodes.Status500InternalServerError); ; 
 ;
 
 app.MapPost("/api/reservations",
@@ -193,7 +207,16 @@ app.MapPost("/api/reservations",
         return Results.Created(
             $"/api/reservations/{reservation.ReservationId}",
             reservation);
-    }).RequireAuthorization(); 
+    }).RequireAuthorization()
+     .WithTags("Reservations")
+     .WithSummary("Create a reservation")
+     .WithDescription("Creates a new reservation after validating the customer, restaurant, table, and party size.")
+     .Accepts<ReservationRequest>("application/json")
+     .Produces<Reservation>(StatusCodes.Status201Created)
+     .ProducesValidationProblem()
+     .Produces(StatusCodes.Status400BadRequest)
+     .Produces(StatusCodes.Status401Unauthorized)
+     .Produces(StatusCodes.Status500InternalServerError); ; 
 ;
 
 app.MapPut("/api/reservations/{id:int}",
@@ -285,7 +308,17 @@ app.MapPut("/api/reservations/{id:int}",
         await db.SaveChangesAsync();
 
         return Results.Ok(reservation);
-    }).RequireAuthorization(); 
+    }).RequireAuthorization()
+       .WithTags("Reservations")
+.WithSummary("Update a reservation")
+.WithDescription("Updates an existing reservation by ID.")
+.Accepts<ReservationRequest>("application/json")
+.Produces<Reservation>(StatusCodes.Status200OK)
+.ProducesValidationProblem()
+.Produces(StatusCodes.Status400BadRequest)
+.Produces(StatusCodes.Status401Unauthorized)
+.Produces(StatusCodes.Status404NotFound)
+.Produces(StatusCodes.Status500InternalServerError); ; 
 ;
 
 app.MapDelete("/api/reservations/{id:int}",
@@ -311,7 +344,15 @@ app.MapDelete("/api/reservations/{id:int}",
         await db.SaveChangesAsync();
 
         return Results.NoContent();
-    }).RequireAuthorization(); 
+    }).RequireAuthorization()
+     .WithTags("Reservations")
+.WithSummary("Delete a reservation")
+.WithDescription("Deletes an existing reservation by ID.")
+.Produces(StatusCodes.Status204NoContent)
+.Produces(StatusCodes.Status400BadRequest)
+.Produces(StatusCodes.Status401Unauthorized)
+.Produces(StatusCodes.Status404NotFound)
+.Produces(StatusCodes.Status500InternalServerError); ; 
 ;
 
 app.MapGet("/api/employees/managers",
@@ -320,7 +361,13 @@ app.MapGet("/api/employees/managers",
         var managers = await repository.ListManagersAsync();
 
         return Results.Ok(managers);
-    }).RequireAuthorization(); 
+    }).RequireAuthorization()
+       .WithTags("Employees")
+.WithSummary("Get all managers")
+.WithDescription("Retrieves all employees whose position is Manager.")
+.Produces<List<Employee>>(StatusCodes.Status200OK)
+.Produces(StatusCodes.Status401Unauthorized)
+.Produces(StatusCodes.Status500InternalServerError); ; 
 ;
 
 app.MapGet("/api/reservations/customer/{customerId:int}",
@@ -349,7 +396,15 @@ app.MapGet("/api/reservations/customer/{customerId:int}",
             await repository.GetReservationsByCustomerAsync(customerId);
 
         return Results.Ok(reservations);
-    }).RequireAuthorization(); 
+    }).RequireAuthorization()
+      .WithTags("Reservations")
+.WithSummary("Get reservations by customer")
+.WithDescription("Retrieves all reservations belonging to a specific customer.")
+.Produces<List<Reservation>>(StatusCodes.Status200OK)
+.Produces(StatusCodes.Status400BadRequest)
+.Produces(StatusCodes.Status401Unauthorized)
+.Produces(StatusCodes.Status404NotFound)
+.Produces(StatusCodes.Status500InternalServerError); ; 
 ;
 
 app.MapGet("/api/reservations/{reservationId:int}/orders",
@@ -402,7 +457,15 @@ app.MapGet("/api/reservations/{reservationId:int}/orders",
         });
 
         return Results.Ok(result);
-    }).RequireAuthorization(); 
+    }).RequireAuthorization()
+       .WithTags("Reservations")
+.WithSummary("Get reservation orders")
+.WithDescription("Retrieves all orders for a reservation including their ordered menu items.")
+.Produces(StatusCodes.Status200OK)
+.Produces(StatusCodes.Status400BadRequest)
+.Produces(StatusCodes.Status401Unauthorized)
+.Produces(StatusCodes.Status404NotFound)
+.Produces(StatusCodes.Status500InternalServerError); ; 
 ;
 
 app.MapGet("/api/reservations/{reservationId:int}/menu-items",
@@ -431,7 +494,15 @@ app.MapGet("/api/reservations/{reservationId:int}/menu-items",
             await repository.ListOrderedMenuItemsAsync(reservationId);
 
         return Results.Ok(menuItems);
-    }).RequireAuthorization(); 
+    }).RequireAuthorization()
+    .WithTags("Reservations")
+.WithSummary("Get ordered menu items")
+.WithDescription("Retrieves the distinct menu items ordered for a reservation.")
+.Produces<List<MenuItem>>(StatusCodes.Status200OK)
+.Produces(StatusCodes.Status400BadRequest)
+.Produces(StatusCodes.Status401Unauthorized)
+.Produces(StatusCodes.Status404NotFound)
+.Produces(StatusCodes.Status500InternalServerError); ; 
 ;
 
 app.MapGet("/api/employees/{employeeId:int}/average-order-amount",
@@ -464,7 +535,15 @@ app.MapGet("/api/employees/{employeeId:int}/average-order-amount",
             employeeId,
             averageOrderAmount
         });
-    }).RequireAuthorization(); 
+    }).RequireAuthorization()
+    .WithTags("Employees")
+.WithSummary("Get employee average order amount")
+.WithDescription("Calculates the average order amount for a specific employee.")
+.Produces(StatusCodes.Status200OK)
+.Produces(StatusCodes.Status400BadRequest)
+.Produces(StatusCodes.Status401Unauthorized)
+.Produces(StatusCodes.Status404NotFound)
+.Produces(StatusCodes.Status500InternalServerError); ; 
 ;
 
 app.MapPost("/api/auth/login",
@@ -491,7 +570,15 @@ app.MapPost("/api/auth/login",
         {
             accessToken = token
         });
-    });
+    }).WithTags("Authentication")
+.WithSummary("Login")
+.WithDescription("Authenticates the user and returns a JWT access token.")
+.Accepts<LoginRequest>("application/json")
+.Produces(StatusCodes.Status200OK)
+.ProducesValidationProblem()
+.Produces(StatusCodes.Status400BadRequest)
+.Produces(StatusCodes.Status401Unauthorized)
+.Produces(StatusCodes.Status500InternalServerError); ;
 
 app.Run();
 
