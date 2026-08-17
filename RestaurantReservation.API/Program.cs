@@ -3,12 +3,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using RestaurantReservation.API.Models;
 using RestaurantReservation.API.Services;
-using RestaurantReservation.Db;
 using RestaurantReservation.Db.Data;
 using RestaurantReservation.Db.Models;
 using RestaurantReservation.Db.Repositories;
 using System.Text;
-using RestaurantReservation.API.Services;
 using RestaurantReservation.API.Grpc;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -24,6 +22,11 @@ builder.Services.AddDbContext<RestaurantReservationDbContext>(options =>
 builder.Services.AddScoped<EmployeeRepository>();
 builder.Services.AddScoped<ReservationRepository>();
 builder.Services.AddScoped<OrderRepository>();
+builder.Services.AddScoped<CustomerRepository>();
+builder.Services.AddScoped<RestaurantRepository>();
+builder.Services.AddScoped<RestaurantTableRepository>();
+
+builder.Services.AddScoped<ReservationService>();
 builder.Services.AddScoped<JwtTokenGenerator>();
 
 
@@ -90,26 +93,24 @@ app.UseExceptionHandler(exceptionHandlerApp =>
     });
 });
 
-app.MapGet("/api/reservations", async (RestaurantReservationDbContext db) =>
-{
-    var reservations = await db.Reservations
-        .AsNoTracking()
-        .ToListAsync();
+app.MapGet("/api/reservations",
+    async (ReservationService service) =>
+    {
+        var reservations = await service.GetAllAsync();
 
-    return Results.Ok(reservations);
-})
+        return Results.Ok(reservations);
+    })
     .RequireAuthorization()
     .WithTags("Reservations")
     .WithSummary("Get all reservations")
     .WithDescription("Retrieves all reservations.")
     .Produces<List<Reservation>>(StatusCodes.Status200OK)
     .Produces(StatusCodes.Status401Unauthorized)
-    .Produces(StatusCodes.Status500InternalServerError)
-;
+    .Produces(StatusCodes.Status500InternalServerError);
 
 
 app.MapGet("/api/reservations/{id:int}",
-    async (int id, RestaurantReservationDbContext db) =>
+    async (int id, ReservationService service) =>
     {
         if (id <= 0)
         {
@@ -118,12 +119,14 @@ app.MapGet("/api/reservations/{id:int}",
                 message = "ReservationId must be greater than 0."
             });
         }
-        var reservation = await db.Reservations
-            .AsNoTracking()
-            .FirstOrDefaultAsync(r => r.ReservationId == id);
+
+        var reservation = await service.GetByIdAsync(id);
 
         return reservation is null
-            ? Results.NotFound(new { message = "Reservation not found." })
+            ? Results.NotFound(new
+            {
+                message = "Reservation not found."
+            })
             : Results.Ok(reservation);
     })
     .RequireAuthorization()
@@ -134,102 +137,44 @@ app.MapGet("/api/reservations/{id:int}",
     .Produces(StatusCodes.Status400BadRequest)
     .Produces(StatusCodes.Status401Unauthorized)
     .Produces(StatusCodes.Status404NotFound)
-    .Produces(StatusCodes.Status500InternalServerError); ; 
-;
+    .Produces(StatusCodes.Status500InternalServerError);
 
 app.MapPost("/api/reservations",
-    async (ReservationRequest request, RestaurantReservationDbContext db) =>
+    async (
+        ReservationRequest request,
+        ReservationService service) =>
     {
-        var customerExists = await db.Customers
-            .AnyAsync(c => c.CustomerId == request.CustomerId);
+        var result = await service.CreateAsync(request);
 
-        if (!customerExists)
+        if (!result.Success)
         {
             return Results.BadRequest(new
             {
-                message = "The specified customer does not exist."
+                message = result.Error
             });
         }
-
-        var restaurantExists = await db.Restaurants
-            .AnyAsync(r => r.RestaurantId == request.RestaurantId);
-
-        if (!restaurantExists)
-        {
-            return Results.BadRequest(new
-            {
-                message = "The specified restaurant does not exist."
-            });
-        }
-
-        var table = await db.Tables
-            .AsNoTracking()
-            .FirstOrDefaultAsync(t => t.TableId == request.TableId);
-
-        if (table is null)
-        {
-            return Results.BadRequest(new
-            {
-                message = "The specified table does not exist."
-            });
-        }
-
-        if (table.RestaurantId != request.RestaurantId)
-        {
-            return Results.BadRequest(new
-            {
-                message = "The selected table does not belong to the specified restaurant."
-            });
-        }
-
-        if (request.PartySize > table.Capacity)
-        {
-            return Results.BadRequest(new
-            {
-                message = "Party size exceeds the selected table capacity."
-            });
-        }
-
-        if (request.ReservationDate <= DateTime.Now)
-        {
-            return Results.BadRequest(new
-            {
-                message = "Reservation date must be in the future."
-            });
-        }
-
-        var reservation = new Reservation
-        {
-            CustomerId = request.CustomerId,
-            RestaurantId = request.RestaurantId,
-            TableId = request.TableId,
-            ReservationDate = request.ReservationDate,
-            PartySize = request.PartySize
-        };
-
-        db.Reservations.Add(reservation);
-        await db.SaveChangesAsync();
 
         return Results.Created(
-            $"/api/reservations/{reservation.ReservationId}",
-            reservation);
-    }).RequireAuthorization()
-     .WithTags("Reservations")
-     .WithSummary("Create a reservation")
-     .WithDescription("Creates a new reservation after validating the customer, restaurant, table, and party size.")
-     .Accepts<ReservationRequest>("application/json")
-     .Produces<Reservation>(StatusCodes.Status201Created)
-     .ProducesValidationProblem()
-     .Produces(StatusCodes.Status400BadRequest)
-     .Produces(StatusCodes.Status401Unauthorized)
-     .Produces(StatusCodes.Status500InternalServerError); ; 
-;
+            $"/api/reservations/{result.Data!.ReservationId}",
+            result.Data);
+    })
+    .RequireAuthorization()
+    .WithTags("Reservations")
+    .WithSummary("Create a reservation")
+    .WithDescription(
+        "Creates a new reservation after validating the customer, restaurant, table, and party size.")
+    .Accepts<ReservationRequest>("application/json")
+    .Produces<Reservation>(StatusCodes.Status201Created)
+    .ProducesValidationProblem()
+    .Produces(StatusCodes.Status400BadRequest)
+    .Produces(StatusCodes.Status401Unauthorized)
+    .Produces(StatusCodes.Status500InternalServerError);
 
 app.MapPut("/api/reservations/{id:int}",
     async (
         int id,
         ReservationRequest request,
-        RestaurantReservationDbContext db) =>
+        ReservationService service) =>
     {
         if (id <= 0)
         {
@@ -239,96 +184,40 @@ app.MapPut("/api/reservations/{id:int}",
             });
         }
 
-        if (request.ReservationDate <= DateTime.Now)
+        var result = await service.UpdateAsync(id, request);
+
+        if (!result.Success)
         {
+            if (result.ErrorType == ServiceErrorType.NotFound)
+            {
+                return Results.NotFound(new
+                {
+                    message = result.Error
+                });
+            }
+
             return Results.BadRequest(new
             {
-                message = "Reservation date must be in the future."
+                message = result.Error
             });
         }
 
-        var reservation = await db.Reservations.FindAsync(id);
-
-        if (reservation is null)
-        {
-            return Results.NotFound(
-                new { message = "Reservation not found." });
-        }
-
-        var customerExists = await db.Customers
-            .AnyAsync(c => c.CustomerId == request.CustomerId);
-
-        if (!customerExists)
-        {
-            return Results.BadRequest(new
-            {
-                message = "The specified customer does not exist."
-            });
-        }
-
-        var restaurantExists = await db.Restaurants
-            .AnyAsync(r => r.RestaurantId == request.RestaurantId);
-
-        if (!restaurantExists)
-        {
-            return Results.BadRequest(new
-            {
-                message = "The specified restaurant does not exist."
-            });
-        }
-
-        var table = await db.Tables
-            .AsNoTracking()
-            .FirstOrDefaultAsync(t => t.TableId == request.TableId);
-
-        if (table is null)
-        {
-            return Results.BadRequest(new
-            {
-                message = "The specified table does not exist."
-            });
-        }
-
-        if (table.RestaurantId != request.RestaurantId)
-        {
-            return Results.BadRequest(new
-            {
-                message = "The selected table does not belong to the specified restaurant."
-            });
-        }
-
-        if (request.PartySize > table.Capacity)
-        {
-            return Results.BadRequest(new
-            {
-                message = "Party size exceeds the selected table capacity."
-            });
-        }
-
-        reservation.CustomerId = request.CustomerId;
-        reservation.RestaurantId = request.RestaurantId;
-        reservation.TableId = request.TableId;
-        reservation.ReservationDate = request.ReservationDate;
-        reservation.PartySize = request.PartySize;
-
-        await db.SaveChangesAsync();
-
-        return Results.Ok(reservation);
-    }).RequireAuthorization()
-       .WithTags("Reservations")
-.WithSummary("Update a reservation")
-.WithDescription("Updates an existing reservation by ID.")
-.Accepts<ReservationRequest>("application/json")
-.Produces<Reservation>(StatusCodes.Status200OK)
-.ProducesValidationProblem()
-.Produces(StatusCodes.Status400BadRequest)
-.Produces(StatusCodes.Status401Unauthorized)
-.Produces(StatusCodes.Status404NotFound)
-.Produces(StatusCodes.Status500InternalServerError); ; 
-;
+        return Results.Ok(result.Data);
+    })
+    .RequireAuthorization()
+    .WithTags("Reservations")
+    .WithSummary("Update a reservation")
+    .WithDescription("Updates an existing reservation by ID.")
+    .Accepts<ReservationRequest>("application/json")
+    .Produces<Reservation>(StatusCodes.Status200OK)
+    .ProducesValidationProblem()
+    .Produces(StatusCodes.Status400BadRequest)
+    .Produces(StatusCodes.Status401Unauthorized)
+    .Produces(StatusCodes.Status404NotFound)
+    .Produces(StatusCodes.Status500InternalServerError);
 
 app.MapDelete("/api/reservations/{id:int}",
-    async (int id, RestaurantReservationDbContext db) =>
+    async (int id, ReservationService service) =>
     {
         if (id <= 0)
         {
@@ -338,28 +227,27 @@ app.MapDelete("/api/reservations/{id:int}",
             });
         }
 
-        var reservation = await db.Reservations.FindAsync(id);
+        var result = await service.DeleteAsync(id);
 
-        if (reservation is null)
+        if (!result.Success)
         {
-            return Results.NotFound(
-                new { message = "Reservation not found." });
+            return Results.NotFound(new
+            {
+                message = result.Error
+            });
         }
 
-        db.Reservations.Remove(reservation);
-        await db.SaveChangesAsync();
-
         return Results.NoContent();
-    }).RequireAuthorization()
-     .WithTags("Reservations")
-.WithSummary("Delete a reservation")
-.WithDescription("Deletes an existing reservation by ID.")
-.Produces(StatusCodes.Status204NoContent)
-.Produces(StatusCodes.Status400BadRequest)
-.Produces(StatusCodes.Status401Unauthorized)
-.Produces(StatusCodes.Status404NotFound)
-.Produces(StatusCodes.Status500InternalServerError); ; 
-;
+    })
+    .RequireAuthorization()
+    .WithTags("Reservations")
+    .WithSummary("Delete a reservation")
+    .WithDescription("Deletes an existing reservation by ID.")
+    .Produces(StatusCodes.Status204NoContent)
+    .Produces(StatusCodes.Status400BadRequest)
+    .Produces(StatusCodes.Status401Unauthorized)
+    .Produces(StatusCodes.Status404NotFound)
+    .Produces(StatusCodes.Status500InternalServerError);
 
 app.MapGet("/api/employees/managers",
     async (EmployeeRepository repository) =>
@@ -377,7 +265,10 @@ app.MapGet("/api/employees/managers",
 ;
 
 app.MapGet("/api/reservations/customer/{customerId:int}",
-    async (int customerId, ReservationRepository repository, RestaurantReservationDbContext db) =>
+    async (
+        int customerId,
+        ReservationRepository reservationRepository,
+        CustomerRepository customerRepository) =>
     {
         if (customerId <= 0)
         {
@@ -387,10 +278,10 @@ app.MapGet("/api/reservations/customer/{customerId:int}",
             });
         }
 
-        var customerExists = await db.Customers
-            .AnyAsync(c => c.CustomerId == customerId);
+        var customer =
+            await customerRepository.GetByIdAsync(customerId);
 
-        if (!customerExists)
+        if (customer is null)
         {
             return Results.NotFound(new
             {
@@ -399,22 +290,27 @@ app.MapGet("/api/reservations/customer/{customerId:int}",
         }
 
         var reservations =
-            await repository.GetReservationsByCustomerAsync(customerId);
+            await reservationRepository
+                .GetReservationsByCustomerAsync(customerId);
 
         return Results.Ok(reservations);
-    }).RequireAuthorization()
-      .WithTags("Reservations")
-.WithSummary("Get reservations by customer")
-.WithDescription("Retrieves all reservations belonging to a specific customer.")
-.Produces<List<Reservation>>(StatusCodes.Status200OK)
-.Produces(StatusCodes.Status400BadRequest)
-.Produces(StatusCodes.Status401Unauthorized)
-.Produces(StatusCodes.Status404NotFound)
-.Produces(StatusCodes.Status500InternalServerError); ; 
-;
+    })
+    .RequireAuthorization()
+    .WithTags("Reservations")
+    .WithSummary("Get reservations by customer")
+    .WithDescription(
+        "Retrieves all reservations belonging to a specific customer.")
+    .Produces<List<Reservation>>(StatusCodes.Status200OK)
+    .Produces(StatusCodes.Status400BadRequest)
+    .Produces(StatusCodes.Status401Unauthorized)
+    .Produces(StatusCodes.Status404NotFound)
+    .Produces(StatusCodes.Status500InternalServerError);
 
 app.MapGet("/api/reservations/{reservationId:int}/orders",
-    async (int reservationId, OrderRepository repository, RestaurantReservationDbContext db) =>
+    async (
+        int reservationId,
+        OrderRepository orderRepository,
+        ReservationRepository reservationRepository) =>
     {
         if (reservationId <= 0)
         {
@@ -424,10 +320,10 @@ app.MapGet("/api/reservations/{reservationId:int}/orders",
             });
         }
 
-        var reservationExists = await db.Reservations
-           .AnyAsync(r => r.ReservationId == reservationId);
+        var reservation =
+            await reservationRepository.GetByIdAsync(reservationId);
 
-        if (!reservationExists)
+        if (reservation is null)
         {
             return Results.NotFound(new
             {
@@ -436,7 +332,8 @@ app.MapGet("/api/reservations/{reservationId:int}/orders",
         }
 
         var orders =
-            await repository.ListOrdersAndMenuItemsAsync(reservationId);
+            await orderRepository
+                .ListOrdersAndMenuItemsAsync(reservationId);
 
         var result = orders.Select(order => new
         {
@@ -463,19 +360,23 @@ app.MapGet("/api/reservations/{reservationId:int}/orders",
         });
 
         return Results.Ok(result);
-    }).RequireAuthorization()
-       .WithTags("Reservations")
-.WithSummary("Get reservation orders")
-.WithDescription("Retrieves all orders for a reservation including their ordered menu items.")
-.Produces(StatusCodes.Status200OK)
-.Produces(StatusCodes.Status400BadRequest)
-.Produces(StatusCodes.Status401Unauthorized)
-.Produces(StatusCodes.Status404NotFound)
-.Produces(StatusCodes.Status500InternalServerError); ; 
-;
+    })
+    .RequireAuthorization()
+    .WithTags("Reservations")
+    .WithSummary("Get reservation orders")
+    .WithDescription(
+        "Retrieves all orders for a reservation including their ordered menu items.")
+    .Produces(StatusCodes.Status200OK)
+    .Produces(StatusCodes.Status400BadRequest)
+    .Produces(StatusCodes.Status401Unauthorized)
+    .Produces(StatusCodes.Status404NotFound)
+    .Produces(StatusCodes.Status500InternalServerError);
 
 app.MapGet("/api/reservations/{reservationId:int}/menu-items",
-    async (int reservationId, OrderRepository repository, RestaurantReservationDbContext db) =>
+    async (
+        int reservationId,
+        OrderRepository orderRepository,
+        ReservationRepository reservationRepository) =>
     {
         if (reservationId <= 0)
         {
@@ -485,10 +386,10 @@ app.MapGet("/api/reservations/{reservationId:int}/menu-items",
             });
         }
 
-        var reservationExists = await db.Reservations
-            .AnyAsync(r => r.ReservationId == reservationId);
+        var reservation =
+            await reservationRepository.GetByIdAsync(reservationId);
 
-        if (!reservationExists)
+        if (reservation is null)
         {
             return Results.NotFound(new
             {
@@ -497,22 +398,36 @@ app.MapGet("/api/reservations/{reservationId:int}/menu-items",
         }
 
         var menuItems =
-            await repository.ListOrderedMenuItemsAsync(reservationId);
+            await orderRepository
+                .ListOrderedMenuItemsAsync(reservationId);
 
-        return Results.Ok(menuItems);
-    }).RequireAuthorization()
+        var result = menuItems.Select(menuItem => new
+        {
+            menuItem.ItemId,
+            menuItem.RestaurantId,
+            menuItem.Name,
+            menuItem.Description,
+            menuItem.Price
+        });
+
+        return Results.Ok(result);
+    })
+    .RequireAuthorization()
     .WithTags("Reservations")
-.WithSummary("Get ordered menu items")
-.WithDescription("Retrieves the distinct menu items ordered for a reservation.")
-.Produces<List<MenuItem>>(StatusCodes.Status200OK)
-.Produces(StatusCodes.Status400BadRequest)
-.Produces(StatusCodes.Status401Unauthorized)
-.Produces(StatusCodes.Status404NotFound)
-.Produces(StatusCodes.Status500InternalServerError); ; 
-;
+    .WithSummary("Get ordered menu items")
+    .WithDescription(
+        "Retrieves the distinct menu items ordered for a reservation.")
+    .Produces(StatusCodes.Status200OK)
+    .Produces(StatusCodes.Status400BadRequest)
+    .Produces(StatusCodes.Status401Unauthorized)
+    .Produces(StatusCodes.Status404NotFound)
+    .Produces(StatusCodes.Status500InternalServerError);
 
 app.MapGet("/api/employees/{employeeId:int}/average-order-amount",
-    async (int employeeId, OrderRepository repository, RestaurantReservationDbContext db) =>
+    async (
+        int employeeId,
+        OrderRepository orderRepository,
+        EmployeeRepository employeeRepository) =>
     {
         if (employeeId <= 0)
         {
@@ -522,10 +437,10 @@ app.MapGet("/api/employees/{employeeId:int}/average-order-amount",
             });
         }
 
-        var employeeExists = await db.Employees
-            .AnyAsync(e => e.EmployeeId == employeeId);
+        var employee =
+            await employeeRepository.GetByIdAsync(employeeId);
 
-        if (!employeeExists)
+        if (employee is null)
         {
             return Results.NotFound(new
             {
@@ -534,23 +449,25 @@ app.MapGet("/api/employees/{employeeId:int}/average-order-amount",
         }
 
         var averageOrderAmount =
-            await repository.CalculateAverageOrderAmountAsync(employeeId);
+            await orderRepository
+                .CalculateAverageOrderAmountAsync(employeeId);
 
         return Results.Ok(new
         {
             employeeId,
             averageOrderAmount
         });
-    }).RequireAuthorization()
+    })
+    .RequireAuthorization()
     .WithTags("Employees")
-.WithSummary("Get employee average order amount")
-.WithDescription("Calculates the average order amount for a specific employee.")
-.Produces(StatusCodes.Status200OK)
-.Produces(StatusCodes.Status400BadRequest)
-.Produces(StatusCodes.Status401Unauthorized)
-.Produces(StatusCodes.Status404NotFound)
-.Produces(StatusCodes.Status500InternalServerError); ; 
-;
+    .WithSummary("Get employee average order amount")
+    .WithDescription(
+        "Calculates the average order amount for a specific employee.")
+    .Produces(StatusCodes.Status200OK)
+    .Produces(StatusCodes.Status400BadRequest)
+    .Produces(StatusCodes.Status401Unauthorized)
+    .Produces(StatusCodes.Status404NotFound)
+    .Produces(StatusCodes.Status500InternalServerError);
 
 app.MapPost("/api/auth/login",
     (LoginRequest request, JwtTokenGenerator tokenGenerator) =>
